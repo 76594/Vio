@@ -1,0 +1,154 @@
+local Map = workspace:WaitForChild("Map")
+local RunService = game:GetService("RunService")
+
+local function getRepairProgress(obj)
+    local attr = obj:GetAttribute("RepairProgress")
+    return type(attr) == "number" and attr or 0
+end
+
+local function addHighlight(obj)
+    if obj:IsA("Model") and obj.Name == "Generator" then
+        -- 高亮
+        local h = Instance.new("Highlight")
+        h.Adornee = obj
+        h.FillTransparency = 1
+        h.OutlineTransparency = 0
+        h.OutlineColor = Color3.new(1, 0.647, 0)
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = obj
+
+        -- 进度文字（整体缩小）
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ProgressGui"
+        billboard.Adornee = obj
+        billboard.Size = UDim2.new(0, 60, 0, 20) -- 整体尺寸缩小
+        billboard.StudsOffset = Vector3.new(0, 2.2, 0) -- 位置微调
+        billboard.AlwaysOnTop = true
+        billboard.Parent = obj
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "0.0%"
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.TextSize = 14 -- 文字大小缩小
+        label.Font = Enum.Font.Jura
+        label.Parent = billboard
+
+        -- 实时更新
+        task.spawn(function()
+            while obj and obj:IsDescendantOf(workspace) do
+                local progress = getRepairProgress(obj)
+                label.Text = string.format("%.1f%%", progress)
+                RunService.Heartbeat:Wait()
+            end
+        end)
+    end
+end
+
+for _, v in ipairs(Map:GetDescendants()) do
+    addHighlight(v)
+end
+
+Map.DescendantAdded:Connect(function(v)
+    addHighlight(v)
+end)
+
+local function highlightPalletwrong(obj)
+    if obj:IsA("Model") and obj.Name == "Palletwrong" then
+        local hl = Instance.new("Highlight")
+        hl.Adornee = obj
+        hl.FillTransparency = 1
+        hl.OutlineTransparency = 0
+        hl.OutlineColor = Color3.new(0.54, 0.27, 0.08) -- 原木棕色
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Parent = obj
+    end
+end
+
+for _, v in ipairs(Map:GetDescendants()) do
+    highlightPalletwrong(v)
+end
+
+Map.DescendantAdded:Connect(function(v)
+    highlightPalletwrong(v)
+end)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function addEsp(char)
+    if not char then return end
+    char:WaitForChild("HumanoidRootPart")
+    local head = char:WaitForChild("Head")
+
+    -- 高亮边框
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = char
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = char
+
+    -- 头顶名字
+    local billboard = Instance.new("BillboardGui")
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 55, 0, 14)
+    billboard.StudsOffset = Vector3.new(0, 2.0, 0)
+    billboard.Adornee = head
+    billboard.Parent = char
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.Text = "Loading..."
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.Fantasy
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    nameLabel.Parent = billboard
+
+    local player = Players:GetPlayerFromCharacter(char)
+    if not player then return end
+
+    local function updateTeamAndName()
+        nameLabel.Text = player.DisplayName
+
+        -- Spectator团队不显示透视和名字
+        if player.Team and player.Team.Name == "Spectator" then
+            highlight.Enabled = false
+            billboard.Enabled = false
+        elseif player.Team and player.Team.Name == "Killer" then
+            highlight.Enabled = true
+            billboard.Enabled = true
+            highlight.OutlineColor = Color3.new(0.8, 0.3, 0.3)
+            nameLabel.TextColor3 = Color3.new(1, 0.6, 0.6)
+        elseif player.Team and player.Team.Name == "Survivors" then
+            highlight.Enabled = true
+            billboard.Enabled = true
+            highlight.OutlineColor = Color3.new(0.7, 0.7, 0.7)
+            nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        end
+    end
+
+    updateTeamAndName()
+    player:GetPropertyChangedSignal("Team"):Connect(updateTeamAndName)
+    player:GetPropertyChangedSignal("DisplayName"):Connect(updateTeamAndName)
+end
+
+local function onPlayerAdded(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(char)
+        addEsp(char)
+    end)
+    if player.Character then
+        addEsp(player.Character)
+    end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    onPlayerAdded(p)
+end
+Players.PlayerAdded:Connect(onPlayerAdded)
